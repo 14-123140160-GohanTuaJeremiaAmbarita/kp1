@@ -36,55 +36,46 @@ export class GeminiService {
 
     ];
 
-    async chat(question: string): Promise<string> {
+    // backend/src/ai/gemini.service.ts
+async chat(question: string, history: any[] = []): Promise<string> { // Tambahkan parameter history
+    let lastError: unknown;
+    
+    // Gunakan model yang valid
+    const VALID_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
 
-        let lastError: unknown;
-
-        for (const model of this.MODELS) {
-
-            try {
-
-                const response =
-                    await this.ai.models.generateContent({
-
-                        model,
-
-                        contents: question,
-
-                        config: {
-
-                            systemInstruction: SYSTEM_PROMPT,
-
-                            temperature: 0.2,
-
-                            maxOutputTokens: 1000
-
-                        }
-
-                    });
-
-                const text = response.text?.trim();
-
-                if (text) {
-
-                    return text;
-
-                }
-
+    for (const model of VALID_MODELS) {
+        try {
+            // Jika ada history, gunakan chat session agar AI punya memori
+            if (history.length > 0) {
+                const chat = this.ai.chats.create({
+                    model: model,
+                    history: history,
+                    config: {
+                        systemInstruction: SYSTEM_PROMPT,
+                        temperature: 0.3
+                    }
+                });
+                const response = await chat.sendMessage({ message: question });
+                return response.text ?? "Tidak ada respons.";
+            } else {
+                // Chat tunggal tanpa history
+                const response = await this.ai.models.generateContent({
+                    model,
+                    contents: question,
+                    config: {
+                        systemInstruction: SYSTEM_PROMPT,
+                        temperature: 0.2,
+                        maxOutputTokens: 1000
+                    }
+                });
+                return response.text?.trim() ?? "Tidak ada respons.";
             }
-
-            catch (err) {
-
-                lastError = err;
-
-                console.log("Model gagal :", model);
-
-            }
-
+        } catch (err) {
+            lastError = err;
+            console.log("Model gagal :", model);
         }
-
-        throw lastError;
-
     }
+    throw lastError;
+}
 
 }
