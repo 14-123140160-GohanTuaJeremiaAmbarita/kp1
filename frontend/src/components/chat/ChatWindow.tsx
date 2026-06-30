@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessage } from "../../types/chat";
+import type { ChatMessage } from "../../types/chat"; // Wajib import type
 import DataTable from "./DataTable";
 import MarkdownMessage from "./MarkdownMessage";
 
@@ -47,6 +47,8 @@ export default function ChatWindow({ messages, isTyping, onSuggest }: Props) {
                 ? <MarkdownMessage content={msg.content} />
                 : <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
               }
+              
+              {/* Ini yang akan merender tabel jika datanya ada */}
               {msg.table && msg.table.length > 0 && (
                 <DataTable rows={msg.table} />
               )}

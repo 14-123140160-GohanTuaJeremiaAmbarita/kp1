@@ -3,11 +3,11 @@ import Layout from "../components/layout/Layout";
 import Dashboard from "../components/dashboard/Dashboard";
 import KnowledgePage from "../components/knowledge/KnowledgePage";
 import { sendMessage } from "../api/chat";
-import type { ChatMessage } from "../types/chat";
+import type { ChatMessage } from "../types/chat"; // Wajib import type
 
 export default function Home() {
-    const [messages, setMessages]     = useState<ChatMessage[]>([]);
-    const [isTyping, setIsTyping]     = useState(false);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [isTyping, setIsTyping] = useState(false);
     const [activePage, setActivePage] = useState("Chat");
 
     async function handleSend(text: string) {
@@ -27,15 +27,15 @@ export default function Home() {
                 content: m.content
             }));
 
-            const response = await sendMessage(text, history);
-            setMessages([...updatedMessages, response.message]);
+            // Response sekarang langsung berupa objek ChatMessage
+            const botMessage = await sendMessage(text, history);
+            setMessages([...updatedMessages, botMessage]);
 
-        } catch {
+        } catch (error) {
             setMessages(old => [...old, {
                 id: crypto.randomUUID(),
                 role: "assistant",
-                content: "Terjadi kesalahan. Coba lagi.",
-                table: []
+                content: "Terjadi kesalahan pada server. Coba lagi.",
             }]);
         } finally {
             setIsTyping(false);

@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import compression from "compression";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -11,8 +13,7 @@ import assetRoutes from "./routes/asset.routes";
 import chatbotRoutes from "./routes/chatbot.routes";
 import dashboardRouter from "./routes/dashboard.routes";
 import exportRoutes from "./routes/export.routes";
-
-dotenv.config();
+import authRoutes from "./routes/auth.routes";
 
 const app = express();
 
@@ -45,6 +46,9 @@ app.use(
     exportRoutes
 
 );
+
+app.use("/api/auth", authRoutes);
+
 app.get("/", (_, res) => {
 
     res.json({

@@ -1,13 +1,16 @@
 import api from "./axios";
-import type { ChatMessage } from "../types/chat";
+import type { ChatMessage } from "../types/chat"; // Wajib menggunakan 'import type'
 
 const SESSION_ID = crypto.randomUUID();
 
-export async function sendMessage(message: string, history: Pick<ChatMessage, "role" | "content">[] = []) {
+export async function sendMessage(message: string, history: Pick<ChatMessage, "role" | "content">[] = []): Promise<ChatMessage> {
     const { data } = await api.post("/chat", {
         message,
         history,
         sessionId: SESSION_ID
     });
-    return data;
+    
+    // Backend mengirim { success: true, message: { id, role, content, table } }
+    // Kita langsung kembalikan 'data.message' agar mudah dipakai
+    return data.message;
 }
