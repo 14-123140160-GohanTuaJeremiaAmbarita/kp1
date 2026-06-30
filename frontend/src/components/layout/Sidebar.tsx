@@ -35,7 +35,7 @@ export default function Sidebar({ active, onSelect }: Props) {
           </button>
         ))}
       </div>
-      <div className="sidebar-footer">© 2025 PT Voksel Electric Tbk</div>
+      <div className="sidebar-footer">© 2026 PT Voksel Electric Tbk</div>
     </aside>
   );
 }

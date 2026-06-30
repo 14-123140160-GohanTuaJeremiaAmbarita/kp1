@@ -1,81 +1,80 @@
 import { GoogleGenAI } from "@google/genai";
 
 const SYSTEM_PROMPT = `
-Kamu adalah Smart IT Assistant PT Voksel.
+Kamu adalah Smart IT Assistant PT Voksel Electric Tbk.
 
 Aturan:
-
-- Jangan memperkenalkan diri.
-- Jangan membuat salam pembuka.
-- Jawab langsung inti pertanyaan.
-- Gunakan Bahasa Indonesia.
-- Maksimal 5 kalimat.
+- Jawab langsung inti pertanyaan dalam Bahasa Indonesia.
+- Jangan membuat salam pembuka atau memperkenalkan diri.
+- Maksimal 5 kalimat, gunakan bullet points jika perlu.
 - Jika ditanya data perusahaan, gunakan data yang diberikan sistem.
 - Jika data tidak tersedia, jawab "Data tidak ditemukan."
+- Kamu boleh menjawab pertanyaan umum, bahasa, dan pengetahuan umum.
 `;
+
+interface HistoryMessage {
+    role: string;
+    content: string;
+}
 
 export class GeminiService {
 
     private ai: GoogleGenAI;
 
     constructor() {
-
         this.ai = new GoogleGenAI({
-
             apiKey: process.env.GEMINI_API_KEY!
-
         });
-
     }
 
     private readonly MODELS = [
-
-        "gemini-3.5-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-2.5-flash"
-
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
     ];
 
-    // backend/src/ai/gemini.service.ts
-async chat(question: string, history: any[] = []): Promise<string> { // Tambahkan parameter history
-    let lastError: unknown;
-    
-    // Gunakan model yang valid
-    const VALID_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+    async chat(question: string, history: HistoryMessage[] = []): Promise<string> {
+        let lastError: unknown;
 
-    for (const model of VALID_MODELS) {
-        try {
-            // Jika ada history, gunakan chat session agar AI punya memori
-            if (history.length > 0) {
-                const chat = this.ai.chats.create({
-                    model: model,
-                    history: history,
-                    config: {
-                        systemInstruction: SYSTEM_PROMPT,
-                        temperature: 0.3
-                    }
-                });
-                const response = await chat.sendMessage({ message: question });
-                return response.text ?? "Tidak ada respons.";
-            } else {
-                // Chat tunggal tanpa history
-                const response = await this.ai.models.generateContent({
-                    model,
-                    contents: question,
-                    config: {
-                        systemInstruction: SYSTEM_PROMPT,
-                        temperature: 0.2,
-                        maxOutputTokens: 1000
-                    }
-                });
-                return response.text?.trim() ?? "Tidak ada respons.";
+        // Konversi history: "assistant" → "model" (format Gemini)
+        const geminiHistory = history
+            .filter(h => h.role === "user" || h.role === "assistant" || h.role === "model")
+            .map(h => ({
+                role: h.role === "assistant" ? "model" : h.role,
+                parts: [{ text: h.content }]
+            }));
+
+        for (const model of this.MODELS) {
+            try {
+                if (geminiHistory.length > 0) {
+                    const chat = this.ai.chats.create({
+                        model,
+                        history: geminiHistory,
+                        config: {
+                            systemInstruction: SYSTEM_PROMPT,
+                            temperature: 0.3,
+                            maxOutputTokens: 1000
+                        }
+                    });
+                    const response = await chat.sendMessage({ message: question });
+                    return response.text?.trim() ?? "Tidak ada respons.";
+                } else {
+                    const response = await this.ai.models.generateContent({
+                        model,
+                        contents: question,
+                        config: {
+                            systemInstruction: SYSTEM_PROMPT,
+                            temperature: 0.2,
+                            maxOutputTokens: 1000
+                        }
+                    });
+                    return response.text?.trim() ?? "Tidak ada respons.";
+                }
+            } catch (err) {
+                lastError = err;
+                console.log("Model gagal:", model);
             }
-        } catch (err) {
-            lastError = err;
-            console.log("Model gagal :", model);
         }
+        throw lastError;
     }
-    throw lastError;
-}
-
 }

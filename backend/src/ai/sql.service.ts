@@ -6,121 +6,119 @@ import { AssetService } from "../services/asset.service";
 export class SQLService {
 
     private employeeService = new EmployeeService();
-    private ticketService = new TicketService();
+    private ticketService   = new TicketService();
     private workorderService = new WorkOrderService();
-    private assetService = new AssetService();
+    private assetService    = new AssetService();
 
     async execute(message: string) {
         const q = message.toLowerCase().trim();
 
         // ==========================================
-        // DEPARTMENT SPESIFIK — cek lebih dulu
+        // NAMA ORANG — "data pak indra", "cari jaenudin"
         // ==========================================
-
-        // IT
-        if (this.matchDept(q, "it")) {
-            const data = await this.employeeService.getDepartment("IT");
-            return {
-                type: "employees",
-                answer: `Departemen IT memiliki ${data.length} karyawan.`,
-                data
-            };
+        const namePrefixes = ["pak ", "bu ", "bapak ", "ibu ", "mas ", "mbak "];
+        for (const prefix of namePrefixes) {
+            if (q.includes(prefix)) {
+                const name = q.split(prefix)[1]?.split(" ")[0]?.trim();
+                if (name && name.length > 1) {
+                    const data = await this.employeeService.search(name);
+                    return {
+                        type: "employees",
+                        answer: data.length > 0
+                            ? `Ditemukan ${data.length} karyawan dengan nama "${name}".`
+                            : `Tidak ada karyawan dengan nama "${name}".`,
+                        data
+                    };
+                }
+            }
         }
 
-        // HRD
-        if (this.matchDept(q, "hrd")) {
-            const data = await this.employeeService.getDepartment("HRD");
-            return {
-                type: "employees",
-                answer: `Departemen HRD memiliki ${data.length} karyawan.`,
-                data
-            };
-        }
+        // ==========================================
+        // DEPARTMENT — cek eksplisit dulu sebelum keyword umum
+        // ==========================================
+        const deptMap: Record<string, string> = {
+            "marketing":    "MARKETING",
+            "pemasaran":    "MARKETING",
+            "it":           "IT",
+            "hrd":          "HRD",
+            "hr":           "HRD",
+            "accounting":   "ACCOUNTING",
+            "accunting":    "ACCOUNTING",
+            "akunting":     "ACCOUNTING",
+            "finance":      "FINANCE",
+            "keuangan":     "FINANCE",
+            "ppic":         "PPIC",
+            "procurement":  "PROCUREMENT",
+            "pengadaan":    "PROCUREMENT",
+            "ga":           "GA",
+            "general affair": "GA",
+            "logistic":     "LOGISTIC OUT",
+            "logistik":     "LOGISTIC OUT",
+            "mr":           "MR",
+            "prodalc":      "PRODALC",
+            "warehouse":    "WAREHOUSE",
+            "gudang":       "WAREHOUSE",
+            "engineering":  "ENGINEERING",
+            "qa":           "QA",
+            "qc":           "QC",
+            "sales":        "SALES",
+            "export":       "EXPORT",
+            "import":       "IMPORT",
+        };
 
-        // ACCOUNTING
-        if (this.matchDept(q, "accounting") || this.matchDept(q, "akuntansi")) {
-            const data = await this.employeeService.getDepartment("ACCOUNTING");
-            return {
-                type: "employees",
-                answer: `Departemen Accounting memiliki ${data.length} karyawan.`,
-                data
-            };
-        }
+        // Deteksi dept dengan regex word boundary
+        for (const [key, deptName] of Object.entries(deptMap)) {
+            // Khusus "it" dan "ga" pakai word boundary agar tidak cocok dengan kata lain
+            const isShort = key.length <= 2;
+            const pattern = isShort
+                ? new RegExp(`\\b${key}\\b`)
+                : new RegExp(key);
 
-        // FINANCE
-        if (this.matchDept(q, "finance") || this.matchDept(q, "keuangan")) {
-            const data = await this.employeeService.getDepartment("FINANCE");
-            return {
-                type: "employees",
-                answer: `Departemen Finance memiliki ${data.length} karyawan.`,
-                data
-            };
-        }
+            if (pattern.test(q)) {
+                // Apakah query adalah tentang karyawan?
+                const isEmpQuery =
+                    q.includes("karyawan") || q.includes("pegawai") ||
+                    q.includes("staff") || q.includes("data") ||
+                    q.includes("employee") || q.includes("berapa") ||
+                    q.includes("jumlah") || q.includes("tampilkan") ||
+                    q.includes("lihat") || q.includes("show") ||
+                    !q.includes("ticket") && !q.includes("tiket") &&
+                    !q.includes("work order") && !q.includes("asset") &&
+                    !q.includes("komputer") && !q.includes("computer");
 
-        // MARKETING
-        if (this.matchDept(q, "marketing") || this.matchDept(q, "pemasaran")) {
-            const data = await this.employeeService.getDepartment("MARKETING");
-            return {
-                type: "employees",
-                answer: `Departemen Marketing memiliki ${data.length} karyawan.`,
-                data
-            };
-        }
-
-        // PROCUREMENT
-        if (this.matchDept(q, "procurement") || this.matchDept(q, "pengadaan")) {
-            const data = await this.employeeService.getDepartment("PROCUREMENT");
-            return {
-                type: "employees",
-                answer: `Departemen Procurement memiliki ${data.length} karyawan.`,
-                data
-            };
-        }
-
-        // LOGISTIC
-        if (this.matchDept(q, "logistic") || this.matchDept(q, "logistik")) {
-            const data = await this.employeeService.getDepartment("LOGISTIC OUT");
-            return {
-                type: "employees",
-                answer: `Departemen Logistic memiliki ${data.length} karyawan.`,
-                data
-            };
-        }
-
-        // GA
-        if (this.matchDept(q, "ga") || this.matchDept(q, "general affair")) {
-            const data = await this.employeeService.getDepartment("GA");
-            return {
-                type: "employees",
-                answer: `Departemen GA memiliki ${data.length} karyawan.`,
-                data
-            };
-        }
-
-        // PPIC
-        if (this.matchDept(q, "ppic")) {
-            const data = await this.employeeService.getDepartment("PPIC");
-            return {
-                type: "employees",
-                answer: `Departemen PPIC memiliki ${data.length} karyawan.`,
-                data
-            };
+                if (isEmpQuery) {
+                    const data = await this.employeeService.getDepartment(deptName);
+                    return {
+                        type: "employees",
+                        answer: `Departemen ${deptName} memiliki ${data.length} karyawan.`,
+                        data
+                    };
+                }
+            }
         }
 
         // ==========================================
         // EMPLOYEE — semua karyawan
         // ==========================================
         if (
-            q.includes("karyawan") ||
-            q.includes("pegawai") ||
-            q.includes("employee") ||
-            q.includes("staff") ||
-            q.includes("personel") ||
-            q.includes("data karyawan") ||
-            q.includes("semua karyawan") ||
-            q.includes("berapa karyawan") ||
-            q.includes("jumlah karyawan")
+            q.includes("karyawan") || q.includes("pegawai") ||
+            q.includes("employee") || q.includes("semua staff") ||
+            (q.includes("data") && q.includes("karyawan"))
         ) {
+            // Cek apakah ada keyword nama spesifik setelah strip kata umum
+            const keyword = q
+                .replace(/data|karyawan|pegawai|employee|semua|seluruh|berikan|tampilkan|cari|lihat/g, "")
+                .trim();
+
+            if (keyword.length > 1) {
+                const data = await this.employeeService.search(keyword);
+                return {
+                    type: "employees",
+                    answer: `Ditemukan ${data.length} karyawan dengan kata kunci "${keyword}".`,
+                    data
+                };
+            }
+
             const data = await this.employeeService.getAllEmployees();
             return {
                 type: "employees",
@@ -133,11 +131,8 @@ export class SQLService {
         // TICKET
         // ==========================================
         if (
-            q.includes("ticket") ||
-            q.includes("tiket") ||
-            q.includes("problem") ||
-            q.includes("kendala") ||
-            q.includes("laporan masalah")
+            q.includes("ticket") || q.includes("tiket") ||
+            q.includes("problem") || q.includes("kendala")
         ) {
             const keyword = q
                 .replace(/ticket|tiket|problem|kendala/g, "")
@@ -158,10 +153,8 @@ export class SQLService {
         // WORK ORDER
         // ==========================================
         if (
-            q.includes("work order") ||
-            q.includes("workorder") ||
-            q.includes("wo ") ||
-            q === "wo"
+            q.includes("work order") || q.includes("workorder") ||
+            /\bwo\b/.test(q)
         ) {
             const keyword = q
                 .replace(/work order|workorder|wo/g, "")
@@ -182,17 +175,13 @@ export class SQLService {
         // ASSET / KOMPUTER
         // ==========================================
         if (
-            q.includes("komputer") ||
-            q.includes("computer") ||
-            q.includes("laptop") ||
-            q.includes("notebook") ||
-            q.includes("aset") ||
-            q.includes("asset") ||
-            q.includes("cpu") ||
-            (q.includes("pc") && !q.includes("ppic"))
+            q.includes("komputer") || q.includes("computer") ||
+            q.includes("laptop") || q.includes("aset") ||
+            q.includes("asset") || q.includes("cpu") ||
+            (/\bpc\b/.test(q) && !q.includes("ppic"))
         ) {
             const keyword = q
-                .replace(/komputer|computer|laptop|notebook|aset|asset|cpu|pc/g, "")
+                .replace(/komputer|computer|laptop|aset|asset|cpu|pc/g, "")
                 .trim();
 
             const data = keyword.length
@@ -207,20 +196,5 @@ export class SQLService {
         }
 
         return null;
-    }
-
-    // Helper: cek apakah query mengandung nama departemen
-    private matchDept(q: string, dept: string): boolean {
-        // Pastikan "it" tidak cocok dengan kata seperti "ticket", "tiket", "kriteria"
-        if (dept === "it") {
-            return /\bit\b/.test(q);
-        }
-        if (dept === "ga") {
-            return /\bga\b/.test(q);
-        }
-        if (dept === "wo") {
-            return /\bwo\b/.test(q);
-        }
-        return q.includes(dept);
     }
 }

@@ -5,18 +5,16 @@ const chatbot = new ChatbotService();
 
 export async function chat(req: Request, res: Response) {
     try {
-        const { message, history } = req.body;
-        const result = await chatbot.chat(message, history || []);
+        const { message, history, sessionId } = req.body;
+        const result = await chatbot.chat(
+            message,
+            history || [],
+            sessionId || "default"
+        );
 
-        res.json({
-            success: true,
-            message: result
-        });
+        res.json({ success: true, message: result });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            success: false,
-            message: "Internal Server Error"
-        });
+        console.error("Chat Controller Error:", err);
+        res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 }
