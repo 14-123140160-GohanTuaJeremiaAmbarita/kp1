@@ -873,3 +873,105 @@ body { background: var(--background); color: var(--text); }
 .kb-badge--faq    { background: #E8F0F9; color: #003B73; }
 .kb-badge--sop    { background: #E8F5E9; color: #1B5E20; }
 .kb-badge--manual { background: #FFF3E0; color: #E65100; }
+
+/* ===== MODEL SELECTOR (tambahan, tempel di akhir App.css) ===== */
+/* Ganti/timpa blok .model-selector* lama kalau sudah pernah ditempel sebelumnya */
+
+.chat-input {
+  position: relative;
+}
+
+.model-selector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.model-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--primary-dark);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.model-selector-trigger:hover {
+  background: var(--primary-light);
+}
+
+.model-selector-caret {
+  font-size: 12px;
+  color: var(--primary);
+  transition: transform 0.15s;
+  line-height: 1;
+}
+
+.model-selector-caret.up {
+  transform: rotate(180deg);
+}
+
+.model-selector-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  min-width: 260px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 59, 115, 0.18);
+  padding: 6px;
+  z-index: 20;
+}
+
+.model-selector-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.model-selector-item:hover {
+  background: var(--primary-light);
+}
+
+.model-selector-item.active {
+  background: var(--primary-light);
+}
+
+.model-selector-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-selector-item-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.model-selector-item-badge {
+  font-size: 12px;
+  color: var(--primary);
+}
+
+.model-selector-check {
+  color: var(--primary);
+  font-weight: 700;
+}

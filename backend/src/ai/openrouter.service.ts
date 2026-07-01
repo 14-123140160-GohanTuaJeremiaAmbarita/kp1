@@ -1,4 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
+// src/ai/gemini.service.ts
+// Versi OpenRouter dengan dukungan pemilihan model dinamis dari frontend.
+
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -16,7 +18,7 @@ Kalau pengguna meminta data/kolom yang tidak ada di skema, jawab dengan action G
 ${schemaText}
 === AKHIR SKEMA ===
 
-Merespons HARUS dalam format JSON MURNI berikut:
+Kamu HARUS merespons HANYA dengan JSON MURNI (tanpa markdown code fence, tanpa teks tambahan apapun di luar JSON) dengan format berikut:
 {
   "action": "EXECUTE_SQL" atau "GENERAL_CHAT",
   "sqlQuery": "T-SQL SELECT query yang valid jika EXECUTE_SQL. Kosongkan jika GENERAL_CHAT.",
@@ -67,41 +69,129 @@ Berikan ringkasan informasi dalam bahasa Indonesia berdasarkan data hasil query 
 Sebutkan jumlah total data yang ditemukan dan poin-poin insight penting secara ringkas menggunakan bullet points (maksimal 5 poin). Jangan tampilkan salam pembuka yang berulang.
 `;
 
+/** Daftar model yang BOLEH dipilih dari frontend — proteksi supaya user tidak bisa kirim model_id sembarangan lewat request langsung ke API. */
+const ALLOWED_MODELS = new Set([
+    "deepseek/deepseek-chat",
+    "deepseek/deepseek-v4-pro",
+    "openai/gpt-4o-mini",
+    "openai/gpt-5",
+    "google/gemini-2.5-flash",
+    "anthropic/claude-sonnet-4.5",
+]);
+
 interface HistoryMessage {
     role: string;
     content: string;
 }
 
-export class GeminiService {
-    private readonly MODEL = "gemini-2.5-flash";
+interface OpenRouterChatMessage {
+    role: "system" | "user" | "assistant";
+    content: string;
+}
 
-    private getAI(): GoogleGenAI {
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) throw new Error("GEMINI_API_KEY belum dikonfigurasi.");
-        return new GoogleGenAI({ apiKey });
+interface OpenRouterAPIResponse {
+    choices?: Array<{ message?: { role: string; content: string } }>;
+    error?: { message: string; code?: number };
+}
+
+function normalizeHistoryRole(role: string): "user" | "assistant" {
+    if (role === "model" || role === "assistant") return "assistant";
+    return "user";
+}
+
+export class GeminiService {
+    private readonly DEFAULT_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat";
+    private readonly API_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+    private getApiKey(): string {
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (!apiKey) throw new Error("OPENROUTER_API_KEY belum dikonfigurasi.");
+        return apiKey;
     }
 
-    async analyzeAndChat(question: string, schemaText: string, history: HistoryMessage[] = []): Promise<any> {
-        const ai = this.getAI(); 
+    /** Validasi model yang diminta frontend; fallback ke default kalau tidak dikenali/kosong. */
+    private resolveModel(requestedModel?: string): string {
+        if (requestedModel && ALLOWED_MODELS.has(requestedModel)) return requestedModel;
+        return this.DEFAULT_MODEL;
+    }
+
+    private async callOpenRouter(
+        messages: OpenRouterChatMessage[],
+        temperature: number,
+        forceJson: boolean,
+        model: string
+    ): Promise<string> {
+        const apiKey = this.getApiKey();
+
+        const body: Record<string, any> = {
+            model,
+            messages,
+            temperature,
+        };
+
+        if (forceJson) {
+            body.response_format = { type: "json_object" };
+        }
+
+        const response = await fetch(this.API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+                "HTTP-Referer": process.env.APP_URL || "http://localhost:5173",
+                "X-Title": "Voksel Smart IT Assistant",
+            },
+            body: JSON.stringify(body),
+        });
+
+        const data = (await response.json()) as OpenRouterAPIResponse;
+
+        if (!response.ok || data.error) {
+            const errMsg = data.error?.message || `HTTP ${response.status}`;
+            throw new Error(`OpenRouter API error (model: ${model}): ${errMsg}`);
+        }
+
+        const content = data.choices?.[0]?.message?.content;
+        if (!content) throw new Error("OpenRouter tidak mengembalikan konten yang valid.");
+        return content;
+    }
+
+    private stripJsonFence(text: string): string {
+        return text.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+    }
+
+    async analyzeAndChat(
+        question: string,
+        schemaText: string,
+        history: HistoryMessage[] = [],
+        requestedModel?: string
+    ): Promise<any> {
+        const model = this.resolveModel(requestedModel);
         try {
-            const response = await ai.models.generateContent({
-                model: this.MODEL,
-                contents: question,
-                config: {
-                    systemInstruction: buildRouterSystemPrompt(schemaText),
-                    temperature: 0.1, 
-                    responseMimeType: "application/json" 
-                }
-            });
-            return JSON.parse(response.text?.trim() ?? "{}");
+            const messages: OpenRouterChatMessage[] = [
+                { role: "system", content: buildRouterSystemPrompt(schemaText) },
+                ...history.map((h) => ({
+                    role: normalizeHistoryRole(h.role),
+                    content: h.content,
+                })),
+                { role: "user", content: question },
+            ];
+
+            const rawText = await this.callOpenRouter(messages, 0.1, true, model);
+            return JSON.parse(this.stripJsonFence(rawText));
         } catch (error) {
             console.error("Gagal saat analyzeAndChat:", error);
             throw error;
         }
     }
 
-    async generateFinalAnswerWithData(question: string, databaseData: any[], history: HistoryMessage[] = []): Promise<string> {
-        const ai = this.getAI();
+    async generateFinalAnswerWithData(
+        question: string,
+        databaseData: any[],
+        history: HistoryMessage[] = [],
+        requestedModel?: string
+    ): Promise<string> {
+        const model = this.resolveModel(requestedModel);
         const stringifiedData = JSON.stringify(databaseData.slice(0, 50));
         const promptInsight = `
             Pengguna bertanya: "${question}".
@@ -109,15 +199,13 @@ export class GeminiService {
             Tugas: Buat kesimpulan yang informatif dari data tersebut.
         `;
         try {
-            const response = await ai.models.generateContent({
-                model: this.MODEL,
-                contents: promptInsight,
-                config: {
-                    systemInstruction: ANSWER_SYSTEM_PROMPT,
-                    temperature: 0.3
-                }
-            });
-            return response.text?.trim() ?? "Data gagal diproses oleh AI.";
+            const messages: OpenRouterChatMessage[] = [
+                { role: "system", content: ANSWER_SYSTEM_PROMPT },
+                { role: "user", content: promptInsight },
+            ];
+
+            const rawText = await this.callOpenRouter(messages, 0.3, false, model);
+            return rawText.trim();
         } catch (error) {
             console.error("Gagal saat generateFinalAnswer:", error);
             return "Terjadi kesalahan saat merangkum data.";

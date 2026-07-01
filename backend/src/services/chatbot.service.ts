@@ -1,5 +1,7 @@
+// src/services/chatbot.service.ts
+
 import { randomUUID } from "crypto";
-import { GeminiService } from "../ai/gemini.service";
+import { GeminiService } from "../ai/openrouter.service";
 import { SQLService } from "../ai/sql.service";
 import { SchemaService } from "../ai/schema.service";
 
@@ -9,20 +11,20 @@ const schemaService = new SchemaService();
 
 export class ChatbotService {
 
-    async chat(message: string, history: any[] = [], sessionId: string = "default") {
+    async chat(message: string, history: any[] = [], sessionId: string = "default", model?: string) {
         try {
-            // 0. Ambil skema asli database (cached) supaya Gemini tidak mengarang nama tabel/kolom
+            // 0. Ambil skema asli database (cached) supaya AI tidak mengarang nama tabel/kolom
             const schemaText = await schemaService.getSchemaText();
 
-            // 1. Kirim input user ke Gemini untuk dianalisis (typo dikoreksi & SQL dirumuskan langsung oleh AI)
-            const aiResponse = await gemini.analyzeAndChat(message, schemaText, history);
+            // 1. Kirim input user ke AI untuk dianalisis (typo dikoreksi & SQL dirumuskan langsung oleh AI)
+            const aiResponse = await gemini.analyzeAndChat(message, schemaText, history, model);
 
             // =============================================================
-            // KODE PENGECEKAN: Apakah Gemini memutuskan perlu mengambil data dari database?
+            // KODE PENGECEKAN: Apakah AI memutuskan perlu mengambil data dari database?
             // =============================================================
             if (aiResponse.action === "EXECUTE_SQL") {
                 if (!aiResponse.sqlQuery || typeof aiResponse.sqlQuery !== "string" || !aiResponse.sqlQuery.trim()) {
-                    console.error("[AI LOG] Gemini mengembalikan action EXECUTE_SQL tanpa sqlQuery yang valid.");
+                    console.error("[AI LOG] AI mengembalikan action EXECUTE_SQL tanpa sqlQuery yang valid.");
                     return {
                         id: randomUUID(),
                         role: "assistant",
@@ -31,13 +33,12 @@ export class ChatbotService {
                     };
                 }
 
-                console.log(`[AI LOG] Gemini menghasilkan query SQL: ${aiResponse.sqlQuery}`);
+                console.log(`[AI LOG] Model "${model || "default"}" menghasilkan query SQL: ${aiResponse.sqlQuery}`);
 
-                // 2. Eksekusi query SQL hasil rumusan Gemini ke SQL Server
+                // 2. Eksekusi query SQL hasil rumusan AI ke SQL Server
                 const sqlResult = await sqlService.execute(aiResponse.sqlQuery);
 
                 if (sqlResult.type === "error") {
-                    // Query gagal dieksekusi (mis. tabel/kolom salah, error koneksi, dll) — jangan disamarkan jadi "data kosong"
                     return {
                         id: randomUUID(),
                         role: "assistant",
@@ -47,18 +48,19 @@ export class ChatbotService {
                 }
 
                 if (sqlResult.data && sqlResult.data.length > 0) {
-                    // 3. Masukkan data mentah dari SQL Server kembali ke Gemini untuk disusun menjadi kesimpulan bahasa alami
+                    // 3. Masukkan data mentah dari SQL Server kembali ke AI untuk disusun menjadi kesimpulan bahasa alami
                     const finalAnswer = await gemini.generateFinalAnswerWithData(
-                        message, 
-                        sqlResult.data, 
-                        history
+                        message,
+                        sqlResult.data,
+                        history,
+                        model
                     );
 
                     return {
                         id: randomUUID(),
                         role: "assistant",
                         content: finalAnswer,
-                        table: sqlResult.data // Dikembalikan ke frontend untuk merender komponen tabel UI
+                        table: sqlResult.data
                     };
                 } else {
                     return {
@@ -70,7 +72,7 @@ export class ChatbotService {
                 }
             }
 
-            // Jika Gemini memutuskan input berupa obrolan umum (GENERAL_CHAT)
+            // Jika AI memutuskan input berupa obrolan umum (GENERAL_CHAT)
             return {
                 id: randomUUID(),
                 role: "assistant",

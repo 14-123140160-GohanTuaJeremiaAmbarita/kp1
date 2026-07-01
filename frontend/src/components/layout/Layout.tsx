@@ -1,3 +1,5 @@
+// src/components/layout/Layout.tsx
+
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import ChatWindow from "../chat/ChatWindow";
@@ -13,12 +15,15 @@ interface Props {
     onPageChange: (page: string) => void;
     dashboardContent: ReactNode;
     knowledgeContent: ReactNode;
+    selectedModel: string;
+    onModelChange: (modelId: string) => void;
 }
 
 export default function Layout({
     messages, isTyping, onSend,
     activePage, onPageChange,
-    dashboardContent, knowledgeContent
+    dashboardContent, knowledgeContent,
+    selectedModel, onModelChange
 }: Props) {
     return (
         <div className="app-layout">
@@ -33,7 +38,11 @@ export default function Layout({
                             isTyping={isTyping}
                             onSuggest={onSend}
                         />
-                        <ChatInput onSend={onSend} />
+                        <ChatInput
+                            onSend={onSend}
+                            selectedModel={selectedModel}
+                            onModelChange={onModelChange}
+                        />
                     </section>
                 ) : activePage === "Dashboard" ? (
                     dashboardContent

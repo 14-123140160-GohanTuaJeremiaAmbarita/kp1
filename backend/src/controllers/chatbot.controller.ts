@@ -1,16 +1,18 @@
+// src/controllers/chatbot.controller.ts
+
 import { Request, Response } from "express";
 import { ChatbotService } from "../services/chatbot.service";
 
 const chatbot = new ChatbotService();
 
 export async function chat(req: Request, res: Response) {
-    // console.log('tes');
     try {
-        const { message, history, sessionId } = req.body;
+        const { message, history, sessionId, model } = req.body;
         const result = await chatbot.chat(
             message,
             history || [],
-            sessionId || "default"
+            sessionId || "default",
+            model
         );
 
         res.json({ success: true, message: result });

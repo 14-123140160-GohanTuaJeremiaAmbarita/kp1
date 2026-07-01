@@ -1,13 +1,12 @@
 {
   "name": "smart-it-assistant-backend",
   "version": "1.0.0",
-  "description": "AI Helpdesk Backend menggunakan SQL Server dan Gemini",
+  "description": "AI Helpdesk Backend menggunakan SQL Server dan OpenRouter (DeepSeek)",
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "gemini": "ts-node src/testGemini.ts",
-    "models": "ts-node src/testModels.ts",
+    "test:openrouter": "ts-node src/testOpenRouter.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "clean": "rmdir /s /q dist"
@@ -16,14 +15,14 @@
     "express",
     "typescript",
     "sqlserver",
-    "gemini",
+    "openrouter",
+    "deepseek",
     "ai",
     "helpdesk"
   ],
   "author": "Gohan",
   "license": "ISC",
   "dependencies": {
-    "@google/genai": "^2.10.0",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
