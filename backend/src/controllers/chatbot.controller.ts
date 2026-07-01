@@ -1,23 +1,69 @@
-// src/controllers/chatbot.controller.ts
-
 import { Request, Response } from "express";
 import { ChatbotService } from "../services/chatbot.service";
 
-const chatbot = new ChatbotService();
+const chatbotService = new ChatbotService();
 
-export async function chat(req: Request, res: Response) {
+export async function chat(
+    req: Request,
+    res: Response
+) {
+
     try {
-        const { message, history, sessionId, model } = req.body;
-        const result = await chatbot.chat(
+
+        const {
+
             message,
-            history || [],
-            sessionId || "default",
+
+            conversationId,
+
             model
+
+        } = req.body;
+
+        if (!message) {
+
+            return res.status(400).json({
+
+                success: false,
+
+                message: "Message is required."
+
+            });
+
+        }
+
+        const result = await chatbotService.chat(
+
+            message,
+
+            conversationId,
+
+            model || "Gemini"
+
         );
 
-        res.json({ success: true, message: result });
-    } catch (err) {
-        console.error("Chat Controller Error:", err);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+        return res.json({
+
+            success: true,
+
+            data: result
+
+        });
+
     }
+
+    catch (err) {
+
+        console.error("Chat Controller Error:", err);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: "Internal Server Error"
+
+        });
+
+    }
+
 }

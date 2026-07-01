@@ -1,11 +1,9 @@
-// src/components/chat/ModelSelector.tsx
-
 import { useEffect, useRef, useState } from "react";
 import { MODEL_OPTIONS } from "../../types/models";
 
 interface Props {
   selectedModel: string;
-  onChange(modelId: string): void;
+  onChange: (modelId: string) => void; // Format TS diperbaiki
 }
 
 export default function ModelSelector({ selectedModel, onChange }: Props) {

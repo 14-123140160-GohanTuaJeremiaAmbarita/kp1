@@ -1,13 +1,13 @@
-import { FaChartBar, FaComments, FaUsers, FaDesktop, FaTicketAlt, FaTools } from "react-icons/fa";
+import { FaChartBar, FaComments } from "react-icons/fa";
 import logo from "../../assets/logo voksel.png";
 
+// Menu Karyawan, Asset, Ticket, dan Work Order dihapus dari sidebar.
+// Semua kebutuhan data itu sudah bisa diakses lewat halaman Chat (AI Assistant)
+// secara natural language, jadi halaman terpisah untuk masing-masing modul
+// tidak diperlukan lagi untuk fokus demo KP.
 const menus = [
-  { icon: <FaChartBar />,  text: "Dashboard" },
-  { icon: <FaComments />,  text: "Chat" },
-  { icon: <FaUsers />,     text: "Karyawan" },
-  { icon: <FaDesktop />,   text: "Asset" },
-  { icon: <FaTicketAlt />, text: "Ticket" },
-  { icon: <FaTools />,     text: "Work Order" },
+  { icon: <FaChartBar />, text: "Dashboard" },
+  { icon: <FaComments />, text: "Chat" },
 ];
 
 interface Props {

@@ -46,7 +46,7 @@ export class SchemaService {
         }
 
         try {
-            const pool = getPool();
+            const pool = await getPool();
             // Ambil SEMUA kolom dari SEMUA tabel/schema dulu (tanpa filter di SQL),
             // lalu filter di JS secara case-insensitive. Ini menghindari masalah
             // collation/format penulisan nama tabel yang berbeda dengan ALLOWED_TABLES.

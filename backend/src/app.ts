@@ -14,6 +14,7 @@ import chatbotRoutes from "./routes/chatbot.routes";
 import dashboardRouter from "./routes/dashboard.routes";
 import exportRoutes from "./routes/export.routes";
 import authRoutes from "./routes/auth.routes";
+import historyRoutes from "./routes/history.routes";
 
 const app = express();
 
@@ -48,6 +49,11 @@ app.use(
 );
 
 app.use("/api/auth", authRoutes);
+
+app.use(
+    "/api/history",
+    historyRoutes
+);
 
 app.get("/", (_, res) => {
 

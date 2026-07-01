@@ -1,93 +1,317 @@
-// src/services/chatbot.service.ts
-
 import { randomUUID } from "crypto";
 import { GeminiService } from "../ai/openrouter.service";
 import { SQLService } from "../ai/sql.service";
 import { SchemaService } from "../ai/schema.service";
+import { HistoryService } from "./history.service";
 
 const gemini = new GeminiService();
 const sqlService = new SQLService();
 const schemaService = new SchemaService();
+const historyService = new HistoryService();
 
 export class ChatbotService {
 
-    async chat(message: string, history: any[] = [], sessionId: string = "default", model?: string) {
+    async chat(
+
+        message: string,
+
+        conversationId?: string,
+
+        model: string = "Gemini"
+
+    ) {
+
         try {
-            // 0. Ambil skema asli database (cached) supaya AI tidak mengarang nama tabel/kolom
-            const schemaText = await schemaService.getSchemaText();
 
-            // 1. Kirim input user ke AI untuk dianalisis (typo dikoreksi & SQL dirumuskan langsung oleh AI)
-            const aiResponse = await gemini.analyzeAndChat(message, schemaText, history, model);
+            //---------------------------------------------------
+            // Conversation
+            //---------------------------------------------------
 
-            // =============================================================
-            // KODE PENGECEKAN: Apakah AI memutuskan perlu mengambil data dari database?
-            // =============================================================
+            const currentConversationId =
+                await historyService.createOrGetConversation(
+
+                    conversationId,
+
+                    message,
+
+                    model
+
+                );
+
+            //---------------------------------------------------
+            // Save User Message
+            //---------------------------------------------------
+
+            await historyService.saveUserMessage(
+
+                currentConversationId,
+
+                message,
+
+                model
+
+            );
+
+            //---------------------------------------------------
+            // Load History
+            //---------------------------------------------------
+
+            const history =
+                await historyService.getConversationForAI(
+
+                    currentConversationId
+
+                );
+
+            //---------------------------------------------------
+            // Database Schema
+            //---------------------------------------------------
+
+            const schemaText =
+                await schemaService.getSchemaText();
+
+            //---------------------------------------------------
+            // AI Analyze
+            //---------------------------------------------------
+
+            const aiResponse =
+                await gemini.analyzeAndChat(
+
+                    message,
+
+                    schemaText,
+
+                    history,
+
+                    model
+
+                );
+
+            //---------------------------------------------------
+            // SQL
+            //---------------------------------------------------
+
             if (aiResponse.action === "EXECUTE_SQL") {
-                if (!aiResponse.sqlQuery || typeof aiResponse.sqlQuery !== "string" || !aiResponse.sqlQuery.trim()) {
-                    console.error("[AI LOG] AI mengembalikan action EXECUTE_SQL tanpa sqlQuery yang valid.");
-                    return {
-                        id: randomUUID(),
-                        role: "assistant",
-                        content: "Maaf, saya belum bisa menyusun query yang tepat untuk pertanyaan Anda. Bisa diperjelas lagi?",
-                        table: []
-                    };
-                }
 
-                console.log(`[AI LOG] Model "${model || "default"}" menghasilkan query SQL: ${aiResponse.sqlQuery}`);
+                if (
+                    !aiResponse.sqlQuery ||
+                    aiResponse.sqlQuery.trim() === ""
+                ) {
 
-                // 2. Eksekusi query SQL hasil rumusan AI ke SQL Server
-                const sqlResult = await sqlService.execute(aiResponse.sqlQuery);
+                    const errorMessage =
+                        "Maaf, saya belum dapat membuat SQL yang sesuai.";
 
-                if (sqlResult.type === "error") {
-                    return {
-                        id: randomUUID(),
-                        role: "assistant",
-                        content: "Maaf, terjadi kesalahan saat mengambil data dari database. Silakan coba pertanyaan lain atau hubungi admin jika masalah berlanjut.",
-                        table: []
-                    };
-                }
+                    await historyService.saveAssistantMessage(
 
-                if (sqlResult.data && sqlResult.data.length > 0) {
-                    // 3. Masukkan data mentah dari SQL Server kembali ke AI untuk disusun menjadi kesimpulan bahasa alami
-                    const finalAnswer = await gemini.generateFinalAnswerWithData(
-                        message,
-                        sqlResult.data,
-                        history,
+                        currentConversationId,
+
+                        errorMessage,
+
+                        undefined,
+
                         model
+
                     );
 
                     return {
+
                         id: randomUUID(),
+
+                        conversationId: currentConversationId,
+
                         role: "assistant",
-                        content: finalAnswer,
-                        table: sqlResult.data
-                    };
-                } else {
-                    return {
-                        id: randomUUID(),
-                        role: "assistant",
-                        content: "Data tidak ditemukan di database SQL Server.",
+
+                        content: errorMessage,
+
                         table: []
+
                     };
+
                 }
+
+                console.log(
+                    "[AI SQL]",
+                    aiResponse.sqlQuery
+                );
+
+                //---------------------------------------------------
+
+                const sqlResult =
+                    await sqlService.execute(
+
+                        aiResponse.sqlQuery
+
+                    );
+
+                //---------------------------------------------------
+
+                if (sqlResult.type === "error") {
+
+                    const errorMessage =
+                        "Terjadi kesalahan saat mengambil data.";
+
+                    await historyService.saveAssistantMessage(
+
+                        currentConversationId,
+
+                        errorMessage,
+
+                        aiResponse.sqlQuery,
+
+                        model
+
+                    );
+
+                    return {
+
+                        id: randomUUID(),
+
+                        conversationId: currentConversationId,
+
+                        role: "assistant",
+
+                        content: errorMessage,
+
+                        table: []
+
+                    };
+
+                }
+
+                //---------------------------------------------------
+
+                if (
+
+                    sqlResult.data &&
+
+                    sqlResult.data.length > 0
+
+                ) {
+
+                    const answer =
+                        await gemini.generateFinalAnswerWithData(
+
+                            message,
+
+                            sqlResult.data,
+
+                            history,
+
+                            model
+
+                        );
+
+                    await historyService.saveAssistantMessage(
+
+                        currentConversationId,
+
+                        answer,
+
+                        aiResponse.sqlQuery,
+
+                        model
+
+                    );
+
+                    return {
+
+                        id: randomUUID(),
+
+                        conversationId: currentConversationId,
+
+                        role: "assistant",
+
+                        content: answer,
+
+                        table: sqlResult.data
+
+                    };
+
+                }
+
+                //---------------------------------------------------
+
+                const noData =
+                    "Data tidak ditemukan.";
+
+                await historyService.saveAssistantMessage(
+
+                    currentConversationId,
+
+                    noData,
+
+                    aiResponse.sqlQuery,
+
+                    model
+
+                );
+
+                return {
+
+                    id: randomUUID(),
+
+                    conversationId: currentConversationId,
+
+                    role: "assistant",
+
+                    content: noData,
+
+                    table: []
+
+                };
+
             }
 
-            // Jika AI memutuskan input berupa obrolan umum (GENERAL_CHAT)
+            //---------------------------------------------------
+            // GENERAL CHAT
+            //---------------------------------------------------
+
+            await historyService.saveAssistantMessage(
+
+                currentConversationId,
+
+                aiResponse.content,
+
+                undefined,
+
+                model
+
+            );
+
             return {
+
                 id: randomUUID(),
+
+                conversationId: currentConversationId,
+
                 role: "assistant",
+
                 content: aiResponse.content,
+
                 table: []
+
             };
 
-        } catch (err) {
-            console.error("Error pada alur ChatbotService:", err);
-            return {
-                id: randomUUID(),
-                role: "assistant",
-                content: "Maaf, terjadi kesalahan internal saat memproses data.",
-                table: []
-            };
         }
+
+        catch (err) {
+
+            console.error(err);
+
+            return {
+
+                id: randomUUID(),
+
+                role: "assistant",
+
+                content: "Internal Server Error",
+
+                table: []
+
+            };
+
+        }
+
     }
+
 }
